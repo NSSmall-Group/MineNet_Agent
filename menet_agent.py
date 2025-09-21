@@ -4,15 +4,15 @@ from system_prompt import SystemPrompt
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 
-from agent_tools import get_iii_type_agent_network_status
+from agent_tools import get_iii_type_agent_network_status, generate_security_report
 
 # ------------------------构建Agent--------------------------------------
 llm = ChatOpenAI(
     model="/home/xd/llm_model/Qwen2_5_32B_Instruct/",
     openai_api_key="none",
     openai_api_base=inference_server_url,
-    max_tokens=1024,
-    temperature=1,
+    max_tokens=512,
+    temperature=0,
 )
 # ------------------------构建Agent--------------------------------------
 
@@ -31,7 +31,7 @@ class State(TypedDict):
 
 graph_builder = StateGraph(State)
 
-tools = [get_iii_type_agent_network_status]
+tools = [get_iii_type_agent_network_status, generate_security_report]
 
 # Modification: tell the LLM which tools it can call
 llm_with_tools = llm.bind_tools(tools)
@@ -72,7 +72,7 @@ class BasicToolNode:
         return {"messages": outputs}
 
 
-tool_node = BasicToolNode(tools=[get_iii_type_agent_network_status])
+tool_node = BasicToolNode(tools=tools)
 graph_builder.add_node("tools", tool_node)
 
 def route_tools(
@@ -107,9 +107,9 @@ graph_builder.add_conditional_edges(
     {"tools": "tools", END: END},
 )
 # Any time a tool is called, we return to the chatbot to decide the next step
-graph_builder.add_edge("tools", "chatbot")
-graph_builder.add_edge(START, "chatbot")
-graph = graph_builder.compile()
+graph_builder.add_edge("tools", "chatbot") #工具信息会返回给chatbot
+graph_builder.add_edge(START, "chatbot") 
+graph = graph_builder.compile() # 编译图
 
 def stream_graph_updates(user_input: str):
     for event in graph.stream({"messages": [{"role": "user", "content": user_input}]}):
@@ -129,21 +129,14 @@ print()
 print()
 
 while True:
-    try:
-        user_input = input("User: ")
-        if user_input.lower() in ["quit", "exit", "q"]:
-            print("再见! 期待下次见！")
-            break
-
-        print("----------------------正在思考中，请耐心等待----------------------")
-
-        stream_graph_updates(user_input)
-    except:
-        # fallback if input() is not available
-        user_input = "What do you know about LangGraph?"
-        print("User: " + user_input)
-        stream_graph_updates(user_input)
+    user_input = input("User: ")
+    if user_input.lower() in ["quit", "exit", "q"]:
+        print("再见! 期待下次见！")
         break
+
+    print("----------------------正在思考中，请耐心等待----------------------")
+
+    stream_graph_updates(user_input)
 
 # TODO： 查询当前状态、历史状态
 
