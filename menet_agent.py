@@ -1,14 +1,12 @@
 inference_server_url = "http://localhost:6666/v1"
 from langchain_openai import ChatOpenAI
-from system_prompt import SystemPrompt
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.output_parsers import StrOutputParser
 
 from agent_tools import get_iii_type_agent_network_status, generate_security_report
 
 from utils import Colors
 
 # ------------------------构建Agent--------------------------------------
+# ----------------------------------------------------------------------
 llm = ChatOpenAI(
     model="/home/xd/llm_model/Qwen2_5_32B_Instruct/",
     openai_api_key="none",
@@ -16,20 +14,19 @@ llm = ChatOpenAI(
     max_tokens=512,
     temperature=0,
 )
+print("---------------------------------------------------------------")
+print("----------------------MeNet智能体构建成功----------------------")
+print("---------------------------------------------------------------\n\n")
+
+# ----------------------------------------------------------------------
 # ------------------------构建Agent--------------------------------------
 
 
-from typing import Annotated
-from typing_extensions import TypedDict
+# ------------------------构建流图----------------------------------------
+# ----------------------------------------------------------------------
 from langgraph.graph import StateGraph, START, END
-from langgraph.graph.message import add_messages
-
-class State(TypedDict):
-    # Messages have the type "list". The `add_messages` function
-    # in the annotation defines how this state key should be updated
-    # (in this case, it appends messages to the list, rather than overwriting them)
-    messages: Annotated[list, add_messages]
-
+from utils import State, route_tools
+from utils import BasicToolNode
 
 graph_builder = StateGraph(State)
 
@@ -43,58 +40,8 @@ def chatbot(state: State):
 
 graph_builder.add_node("chatbot", chatbot)
 
-import json
-
-from langchain_core.messages import ToolMessage
-
-
-class BasicToolNode:
-    """A node that runs the tools requested in the last AIMessage."""
-
-    def __init__(self, tools: list) -> None:
-        self.tools_by_name = {tool.name: tool for tool in tools}
-
-    def __call__(self, inputs: dict):
-        if messages := inputs.get("messages", []):
-            message = messages[-1]
-        else:
-            raise ValueError("No message found in input")
-        outputs = []
-        for tool_call in message.tool_calls:
-            tool_result = self.tools_by_name[tool_call["name"]].invoke(
-                tool_call["args"]
-            )
-            outputs.append(
-                ToolMessage(
-                    content=json.dumps(tool_result),
-                    name=tool_call["name"],
-                    tool_call_id=tool_call["id"],
-                )
-            )
-        return {"messages": outputs}
-
-
 tool_node = BasicToolNode(tools=tools)
 graph_builder.add_node("tools", tool_node)
-
-def route_tools(
-    state: State,
-):
-    """
-    Use in the conditional_edge to route to the ToolNode if the last message
-    has tool calls. Otherwise, route to the end.
-    """
-    if isinstance(state, list):
-        ai_message = state[-1]
-    elif messages := state.get("messages", []):
-        ai_message = messages[-1]
-    else:
-        raise ValueError(f"No messages found in input state to tool_edge: {state}")
-    if hasattr(ai_message, "tool_calls") and len(ai_message.tool_calls) > 0:
-        return "tools"
-    
-    return END
-
 
 # The `tools_condition` function returns "tools" if the chatbot asks to use a tool, and "END" if
 # it is fine directly responding. This conditional routing defines the main agent loop.
@@ -112,7 +59,12 @@ graph_builder.add_conditional_edges(
 graph_builder.add_edge("tools", "chatbot") #工具信息会返回给chatbot
 graph_builder.add_edge(START, "chatbot") 
 graph = graph_builder.compile() # 编译图
+# --------------------------------------------------------------------
+# ------------------------构建流图--------------------------------------
 
+
+# ------------------------交互-----------------------------------------
+# --------------------------------------------------------------------
 # #非流式输出，不显示思考过程
 # def stream_graph_updates(user_input: str): 
 #     for event in graph.stream({"messages": [{"role": "user", "content": user_input}]}):
@@ -160,26 +112,24 @@ def stream_graph_updates(user_input: str):
             print("-" * 25 + "\n") # 打印分隔符，让输出更清晰
 
 
-print("----------------------MeNet智能体构建成功----------------------")
-print()
-print()
+print("-------------------------------------------------------------------------------------")
 print("----------------------你好，我是MeNet智能体，有什么我能帮您的？----------------------")
-print()
-print()
+print("-------------------------------------------------------------------------------------\n\n")
+
 
 while True:
     user_input = input("User: ")
     if user_input.lower() in ["quit", "exit", "q"]:
         print("再见! 期待下次见！")
         break
-
+    
+    print("------------------------------------------------------------------")
     print("----------------------正在思考中，请耐心等待----------------------")
+    print("------------------------------------------------------------------")
 
     stream_graph_updates(user_input)
 
+# --------------------------------------------------------------------
+# ------------------------交互-----------------------------------------
+
 # TODO： 查询当前状态、历史状态
-
-# # 5. 调用这个Chain，只需要提供占位符的内容即可
-# response = chain.invoke({"input": "请用中文回答你是谁"})
-
-# print(response)
