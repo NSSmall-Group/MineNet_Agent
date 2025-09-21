@@ -6,6 +6,8 @@ from langchain_core.output_parsers import StrOutputParser
 
 from agent_tools import get_iii_type_agent_network_status, generate_security_report
 
+from utils import Colors
+
 # ------------------------构建Agent--------------------------------------
 llm = ChatOpenAI(
     model="/home/xd/llm_model/Qwen2_5_32B_Instruct/",
@@ -111,14 +113,51 @@ graph_builder.add_edge("tools", "chatbot") #工具信息会返回给chatbot
 graph_builder.add_edge(START, "chatbot") 
 graph = graph_builder.compile() # 编译图
 
-def stream_graph_updates(user_input: str):
+# #非流式输出，不显示思考过程
+# def stream_graph_updates(user_input: str): 
+#     for event in graph.stream({"messages": [{"role": "user", "content": user_input}]}):
+#         for node_name, value in event.items():
+#             # 只打印 chatbot 节点的输出，并且确保不是工具调用
+#             if node_name == "chatbot":
+#                 last_message = value["messages"][-1]
+#                 if not hasattr(last_message, "tool_calls") or len(last_message.tool_calls) == 0:
+#                     print("Assistant:", last_message.content)
+
+
+# 把LLM的决策过程显示出来
+def stream_graph_updates(user_input: str): 
+    # 使用 graph.stream 实时获取图的每一步更新
     for event in graph.stream({"messages": [{"role": "user", "content": user_input}]}):
+        # event 是一个字典，key 是节点名，value 是该节点的输出
         for node_name, value in event.items():
-            # 只打印 chatbot 节点的输出，并且确保不是工具调用
+            print(f"--- [ 节点: {node_name} ] ---")
+            
+            # 从节点的输出中获取最新的消息
+            # 无论是 chatbot 还是 tools 节点，输出的 value 都是 {"messages": [some_message]} 格式
+            last_message = value["messages"][-1]
+
+            # --- 对 chatbot 节点的输出进行解读 ---
             if node_name == "chatbot":
-                last_message = value["messages"][-1]
-                if not hasattr(last_message, "tool_calls") or len(last_message.tool_calls) == 0:
-                    print("Assistant:", last_message.content)
+                # 情况1: LLM 决定调用工具
+                if last_message.tool_calls:
+                    print(Colors.GREEN + "✨ LLM 决策: 我需要使用工具来回答。" + Colors.RESET)
+                    for tool_call in last_message.tool_calls:
+                        tool_name = tool_call['name']
+                        tool_args = tool_call['args']
+                        print(Colors.GREEN + f"   - 准备调用工具: `{tool_name}`" + Colors.RESET)
+                        print(Colors.GREEN + f"   - 提供的参数: {tool_args}" + Colors.RESET)
+                # 情况2: LLM 决定直接回答 (通常是最后一步)
+                else:
+                    print(Colors.CYAN + f"✅ LLM 最终回答:\n{last_message.content}" + Colors.RESET)
+
+            # --- 对 tools 节点的输出进行解读 ---
+            elif node_name == "tools":
+                # tools 节点的输出是 ToolMessage 列表，我们只看最新的一个
+                print(Colors.BLUE + "⚒️  工具执行结果:" + Colors.RESET)
+                print(Colors.BLUE + f"   - 工具 `{last_message.name}` 已执行。" + Colors.RESET)
+                print(Colors.BLUE + f"   - 返回内容: {last_message.content}" + Colors.RESET)
+            
+            print("-" * 25 + "\n") # 打印分隔符，让输出更清晰
 
 
 print("----------------------MeNet智能体构建成功----------------------")
