@@ -1,8 +1,6 @@
 # MineNet_Agent
-<<<<<<< HEAD
 网络安全状况Agent
-/
-=======
+
 > 用于检查当前网络安全状况的Agent。
 
 
@@ -24,4 +22,4 @@ python -m vllm.entrypoints.openai.api_server \
 ```
 python menet_agent.py
 ```
->>>>>>> af2b570c329adf68bd556b681e5f027f8c0f3a76
+
