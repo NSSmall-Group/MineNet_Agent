@@ -11,7 +11,8 @@ python -m vllm.entrypoints.openai.api_server \
   --host localhost \
   --port 6666 \
   --dtype=half \
-  --tensor-parallel-size 4 \
+  --tensor-parallel-size=2  \
+  --pipeline-parallel-size=3 \
   --max_model_len 16384 \
   --gpu_memory_utilization 0.95 \
   --enable-auto-tool-choice \
