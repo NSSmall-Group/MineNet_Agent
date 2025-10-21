@@ -1,8 +1,21 @@
+import os
+
+os.environ["CUDA_VISIBLE_DEVICES"] = ""  #让嵌入模型跑在CPU上，后面也可以服务化解耦，跑在另一台主机上
+
 import requests
 
 import json
 
+from langchain_core.documents import Document
+
+from langchain_community.embeddings import ModelScopeEmbeddings
+
+from langchain_community.vectorstores import Chroma
+
 def process_cve_file(file_path):
+    """
+    预处理CVE漏洞
+    """
     with open(file_path, 'r', encoding='utf-8') as f:
         data = json.load(f)
 
@@ -30,8 +43,8 @@ def process_cve_file(file_path):
     print(data['vulnerabilities'][100]['cve']['metrics']['cvssMetricV31'][0]['cvssData'], "\n\n")
 
 
-
-    knowledge_chunks = []
+    documents = []  #需要处理成一个Document类型
+    # knowledge_chunks = []
     for item in data.get('vulnerabilities'):
         cve_id = item['cve']['id'] #获取漏洞ID
         cve_published_time = item['cve']['published'] #获取漏洞发布时间
@@ -60,20 +73,65 @@ def process_cve_file(file_path):
                       f"CVSS严重程度：{cvss_severity}\n" 
                     )
 
-        # 添加漏洞评分
+        # print(chunk_text)
 
-        print(chunk_text)
+        # knowledge_chunks.append(chunk_text)
 
-        knowledge_chunks.append(chunk_text)
+        metadata = {
+            "cve_id": cve_id,
+            "base_score": cvss_score
+        }
+
+        doc = Document(page_content=chunk_text, metadata=metadata)
+        documents.append(doc)
 
         # break # 调试专用，记得删除
     
-    return knowledge_chunks
+    return documents
+
+
+def create_vector_database(documents, vec_db_dir):
+
+    local_embedding_model_path = '/home/xd/llm_model/nlp_gte_sentence-embedding_chinese-large'
+    
+    if not os.path.isdir(local_embedding_model_path):
+        print("模型不存在，请检查或者从官方下载")
+        exit()
+    
+    embedding_function = ModelScopeEmbeddings(
+        model_id=local_embedding_model_path
+    )
+
+    print("Embeddings模型加载完毕\n\n")
+
+    if not os.path.exists(cve_vec_db_dir):
+        print("未发现向量数据库，开始首次构建...\n\n") 
+
+        if documents:
+            vector_db = Chroma.from_documents(
+                documents=documents,
+                embedding=embedding_function,
+                persist_directory=vec_db_dir
+            )
+
+            print("数据库构建完成")
+        else:
+            exit("未能成功加载文档")
+    else:
+        print("向量数据库已经构建，加载中...")
+        vector_db = Chroma.from_documents(
+            embedding=embedding_function,
+            persist_directory=vec_db_dir
+        )
+        print("向量数据库加载成功")
 
  
-
 if __name__ == '__main__':
     file_path = '/home/xd/llm_deploy/menet_agent/cve/cve_data/nvdcve-2.0-recent.json'
 
-    knowledge_chunks = process_cve_file(file_path=file_path)
-    print(len(knowledge_chunks))
+    cve_knowledge_doc = process_cve_file(file_path=file_path)
+    print(len(cve_knowledge_doc))
+
+    cve_vec_db_dir = '/home/xd/llm_deploy/menet_agent/cve/cve_data/cve_vec_db'
+
+    create_vector_database(documents=cve_knowledge_doc, vec_db_dir=cve_vec_db_dir)
