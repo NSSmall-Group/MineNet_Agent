@@ -1,9 +1,24 @@
 inference_server_url = "http://localhost:6666/v1"
 from langchain_openai import ChatOpenAI
 
-from agent_tools import get_iii_type_agent_network_status, generate_security_report
+from agent_tools import get_iii_type_agent_network_status, generate_security_report, make_cve_retriever_tool
 
-from utils import Colors
+from utils import Colors, create_and_load_vec_db
+
+
+# # ------------------------构建并加载数据库--------------------------------------
+# # ----------------------------------------------------------------------
+
+file_path = '/home/xd/llm_deploy/menet_agent/cve/cve_data/nvdcve-2.0-recent.json'
+cve_vec_db_dir = '/home/xd/llm_deploy/menet_agent/cve/cve_data/cve_vec_db'
+
+retriever = create_and_load_vec_db(file_path=file_path, vec_db_dir=cve_vec_db_dir)
+
+cve_retriever_tool = make_cve_retriever_tool(retriever=retriever)
+
+# # ----------------------------------------------------------------------
+# # ------------------------构建并加载数据库--------------------------------------
+
 
 # ------------------------构建Agent--------------------------------------
 # ----------------------------------------------------------------------
@@ -21,6 +36,11 @@ print("---------------------------------------------------------------\n\n")
 # ----------------------------------------------------------------------
 # ------------------------构建Agent--------------------------------------
 
+# print("---------------------------------------------------------------")
+# print("----------------------MeNet智能体构建成功----------------------")
+# print("---------------------------------------------------------------\n\n")
+
+
 
 # ------------------------构建流图----------------------------------------
 # ----------------------------------------------------------------------
@@ -30,7 +50,7 @@ from utils import BasicToolNode
 
 graph_builder = StateGraph(State)
 
-tools = [get_iii_type_agent_network_status, generate_security_report]
+tools = [get_iii_type_agent_network_status, generate_security_report, cve_retriever_tool]
 
 # Modification: tell the LLM which tools it can call
 llm_with_tools = llm.bind_tools(tools)
@@ -119,6 +139,7 @@ print("-------------------------------------------------------------------------
 
 while True:
     user_input = input("User: ")
+
     if user_input.lower() in ["quit", "exit", "q"]:
         print("再见! 期待下次见！")
         break

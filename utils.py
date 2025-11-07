@@ -65,3 +65,20 @@ def route_tools(
         return "tools"
     
     return END
+
+from cve.cve_vec_db import process_cve_file, create_vector_database
+
+def create_and_load_vec_db(file_path, vec_db_dir):
+    # file_path = '/home/xd/llm_deploy/menet_agent/cve/cve_data/nvdcve-2.0-recent.json'
+    
+    cve_knowledge_doc = process_cve_file(file_path=file_path)
+
+    # print(len(cve_knowledge_doc))
+
+    # cve_vec_db_dir = '/home/xd/llm_deploy/menet_agent/cve/cve_data/cve_vec_db'
+
+    retriever = create_vector_database(documents=cve_knowledge_doc, vec_db_dir=vec_db_dir)
+
+    return retriever
+        
+    

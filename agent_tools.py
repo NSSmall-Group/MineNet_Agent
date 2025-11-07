@@ -5,6 +5,15 @@ import json
 
 import os
 
+# --- 必要的 imports ---
+from typing import TypedDict, Annotated, List
+from langchain_core.messages import BaseMessage, HumanMessage
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_openai import ChatOpenAI # 假设你使用OpenAI的LLM作为Agent的大脑
+from langchain_community.vectorstores import Chroma # 确保导入
+from langchain_community.embeddings import ModelScopeEmbeddings # 确保导入
+import os
+
 @tool
 def get_iii_type_agent_network_status():
     """
@@ -54,3 +63,27 @@ def generate_security_report(security_analysis_summary:str)->str:
         return f"报告已成功生成并保存到本地文件: {save_path}"
     except Exception as e:
         return f"生成报告时发生错误: {e}"
+    
+
+def make_cve_retriever_tool(retriever):
+    """
+    一个工厂函数：接受一个retriever，然后返回一个封装了该retriever的LangChain工具
+    """
+    @tool
+    def cve_knowledge_retriever(query: str) -> str:
+        """
+        当用户询问关于特定CVE漏洞、软件漏洞、或网络安全技术问题时，使用此工具检索相关的背景知识。
+        输入应该是用户的原始问题。此工具返回的是原始的技术资料，而不是最终答案。
+        """
+        print(f"\n--- 调用CVE知识库检索工具, 查询: '{query}' ---\n")
+        
+        docs = retriever.invoke(query)
+
+        if not docs:
+            return "--- 在CVE知识库中没有找到相关信息 ---"
+            
+        context = "--- 从CVE知识库中检索到的相关信息 ---\n\n"
+        context += "\n\n---\n\n".join([doc.page_content for doc in docs])
+        return context
+
+    return cve_knowledge_retriever

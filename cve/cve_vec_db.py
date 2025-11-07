@@ -1,6 +1,6 @@
 import os
 
-os.environ["CUDA_VISIBLE_DEVICES"] = ""  #让嵌入模型跑在CPU上，后面也可以服务化解耦，跑在另一台主机上
+# os.environ["CUDA_VISIBLE_DEVICES"] = ""  #让嵌入模型跑在CPU上，后面也可以服务化解耦，跑在另一台主机上
 
 import requests
 
@@ -19,28 +19,35 @@ def process_cve_file(file_path):
     with open(file_path, 'r', encoding='utf-8') as f:
         data = json.load(f)
 
-    print(type(data))
-    print(len(data))
-    print(data.keys())
-    print(data['resultsPerPage'])
-    print(data['startIndex'])
-    print(data['totalResults'])
-    print(data['format'])
-    print(data['version'])
-    print(data['timestamp']) # 更新的最新时间戳
-    print(type(data['vulnerabilities']))
-    print(len(data['vulnerabilities'])) # 漏洞个数
-    print(type(data['vulnerabilities'][0])) # 每个漏洞类型为dict
-    print(data['vulnerabilities'][0].keys()) # 每个漏洞的keys仅仅有一个cve
-    print(data['vulnerabilities'][0]['cve'].keys())  # dict_keys(['cve'])里包含了每个漏洞相关的信息
-    print(data['vulnerabilities'][0]['cve']['descriptions'], "\n\n") #漏洞描述
-    print(data['vulnerabilities'][0]['cve']['published'], "\n\n") #漏洞发布时间
-    print(data['vulnerabilities'][100]['cve']['vulnStatus'], "\n\n") #分析
-    print(data['vulnerabilities'][100]['cve']['metrics'], "\n\n") #漏洞评分CVSS
-    print(type(data['vulnerabilities'][100]['cve']['metrics']), "\n\n") #漏洞评分CVSS
-    print(data['vulnerabilities'][100]['cve']['metrics'].keys(), "\n\n") #漏洞评分CVSS
-    print(data['vulnerabilities'][100]['cve']['metrics']['cvssMetricV31'][0], "\n\n")
-    print(data['vulnerabilities'][100]['cve']['metrics']['cvssMetricV31'][0]['cvssData'], "\n\n")
+    # print(type(data))
+    # print(len(data))
+    # print(data.keys())
+    # print(data['resultsPerPage'])
+    # print(data['startIndex'])
+    # print(data['totalResults'])
+    # print(data['format'])
+    # print(data['version'])
+    # print(data['timestamp']) # 更新的最新时间戳
+    # print(type(data['vulnerabilities']))
+    # print(len(data['vulnerabilities'])) # 漏洞个数
+    # print(type(data['vulnerabilities'][0])) # 每个漏洞类型为dict
+    # print(data['vulnerabilities'][0].keys()) # 每个漏洞的keys仅仅有一个cve
+    # print(data['vulnerabilities'][0]['cve'].keys())  # dict_keys(['cve'])里包含了每个漏洞相关的信息
+    # print(data['vulnerabilities'][0]['cve']['descriptions'], "\n\n") #漏洞描述
+    # print(data['vulnerabilities'][0]['cve']['published'], "\n\n") #漏洞发布时间
+    # print(data['vulnerabilities'][100]['cve']['vulnStatus'], "\n\n") #分析
+    # print(data['vulnerabilities'][100]['cve']['metrics'], "\n\n") #漏洞评分CVSS
+    # print(type(data['vulnerabilities'][100]['cve']['metrics']), "\n\n") #漏洞评分CVSS
+    # print(data['vulnerabilities'][100]['cve']['metrics'].keys(), "\n\n") #漏洞评分CVSS
+    # print(data['vulnerabilities'][100]['cve']['metrics']['cvssMetricV31'][0], "\n\n")
+    # print("-----------------")
+    # print(data['vulnerabilities'][100]['cve']['metrics']['cvssMetricV31'][0]['cvssData'], "\n\n")
+    # standard = list(data['vulnerabilities'][20]['cve']['metrics'].keys())[0]
+    # print(list(data['vulnerabilities'][20]['cve']['metrics'].keys())[0], "\n\n")
+    # print(data['vulnerabilities'][20]['cve']['metrics'][standard][0]['cvssData'])
+    # x = list(data['vulnerabilities'][20]['cve']['metrics'].keys())
+    # print(x[0], "\n\n")
+    # print("-----------------")
 
 
     documents = []  #需要处理成一个Document类型
@@ -55,12 +62,18 @@ def process_cve_file(file_path):
             if desc['lang'] == 'en': # 使用英文描述
                 description = desc['value']
 
-        # 获取漏洞评分 cvss V3.1
-        cvss_metric = data['vulnerabilities'][100]['cve']['metrics']['cvssMetricV31'][0]['cvssData']
-        cvss_version = cvss_metric['version'] # 评分标准版本
-        cvss_score = cvss_metric['baseScore'] # 评分
-        cvss_severity = cvss_metric['baseSeverity'] # 严重程度
-        
+        # 获取漏洞评分 
+        cvss_standard = list(item['cve']['metrics'].keys())  #获取漏洞评分标准
+        if len(cvss_standard) == 0:  # 有的漏洞还没有评分标准
+            cvss_metric = 'N/A' 
+            cvss_version = 'N/A'
+            cvss_score = 'N/A'
+            cvss_severity = 'N/A'
+        else:
+            cvss_metric = item['cve']['metrics'][cvss_standard[0]][0]['cvssData']
+            cvss_version = cvss_metric['version'] # 评分标准版本
+            cvss_score = cvss_metric['baseScore'] # 评分
+            cvss_severity = cvss_metric['baseSeverity'] # 严重程度
         
         # print(description)
 
@@ -102,10 +115,10 @@ def create_vector_database(documents, vec_db_dir):
         model_id=local_embedding_model_path
     )
 
-    print("Embeddings模型加载完毕\n\n")
+    print("----------------------------------Embeddings模型加载完毕-----------------------------------\n\n")
 
-    if not os.path.exists(cve_vec_db_dir):
-        print("未发现向量数据库，开始首次构建...\n\n") 
+    if not os.path.exists(vec_db_dir):
+        print("----------------------------------未发现向量数据库，开始首次构建...\n\n----------------------------------") 
 
         if documents:
             vector_db = Chroma.from_documents(
@@ -114,16 +127,20 @@ def create_vector_database(documents, vec_db_dir):
                 persist_directory=vec_db_dir
             )
 
-            print("数据库构建完成")
+            print("----------------------------------数据库构建完成----------------------------------")
         else:
             exit("未能成功加载文档")
     else:
-        print("向量数据库已经构建，加载中...")
-        vector_db = Chroma.from_documents(
-            embedding=embedding_function,
-            persist_directory=vec_db_dir
+        print("----------------------------------向量数据库已经构建，加载中...----------------------------------")
+        vector_db = Chroma(
+            persist_directory=vec_db_dir,
+            embedding_function=embedding_function
         )
-        print("向量数据库加载成功")
+        print("----------------------------------向量数据库加载成功----------------------------------")
+    
+    retriever = vector_db.as_retriever(search_kwargs={"k": 3}) # k=3, 每次检索返回3个最相关的文档
+
+    return retriever
 
  
 if __name__ == '__main__':
