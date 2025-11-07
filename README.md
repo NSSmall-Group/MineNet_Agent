@@ -4,7 +4,12 @@
 > 用于检查当前网络安全状况的Agent。
 
 
-1. 启动VLLM服务
+1. 启动接口服务
+```
+python get_detect_res_test.py
+```
+
+2. 启动VLLM服务
 ```
 python -m vllm.entrypoints.openai.api_server \
   --model /home/xd/llm_model/Qwen2_5_32B_Instruct/ \
@@ -19,8 +24,13 @@ python -m vllm.entrypoints.openai.api_server \
   --tool_call_parser hermes
 ```
 
-2. 运行Agent
+3. 运行Agent
 ```
 python menet_agent.py
 ```
 
+
+4. Prompt
+```
+请你检查一下3类智能体的网络安全状况,并依据安全状况检索相关的CVE知识，然后一同生成一份网络安全报告。
+```
